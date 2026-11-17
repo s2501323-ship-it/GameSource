@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cyber Grid Escape</title>
+  <style>
+    :root {
+      --bg-color: #0d0f18;
+      --grid-color: #1a2238;
+      --player-color: #00f0ff;
+      --core-color: #ff007f;
+      --drone-color: #ff3333;
+      --exit-locked: #555566;
+      --exit-unlocked: #39ff14;
+    }
+
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background-color: var(--bg-color);
+      color: #ffffff;
+      font-family: 'Courier New', Courier, monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+
+    h1 {
+      color: var(--player-color);
+      margin: 0 0 10px 0;
+      text-shadow: 0 0 10px var(--player-color);
+    }
+
+
+    #hud {
+      display: flex;
+      width: 500px;
+      max-width: calc(100vw - 20px);
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px 12px;
+      margin-bottom: 15px;
+      font-size: 0.95rem;
+      font-weight: bold;
+      background: #141824;
+      padding: 10px 12px;
+      border: 1px solid var(--player-color);
+      border-radius: 6px;
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+    }
+
+
+    #hud span { color: #fff; }
+    #hud > div { white-space: nowrap; }
+    #sound-toggle { margin: 0; padding: 6px 9px; font-size: 0.7rem; white-space: nowrap; }
+
+
+    #game-container {
+      position: relative;
+      width: 500px;
+      height: 500px;
+      background-color: #080a10;
+      border: 2px solid var(--player-color);
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
+    }
+
+
+    #grid-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+
+    .grid-line {
+      stroke: var(--grid-color);
+      stroke-width: 1;
+    }
+
+    #game-container { max-width: 100vw; }
+
+
+    #overlay {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(13, 15, 24, 0.92);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      padding: 20px;
+      overflow-y: auto;
+    }
+
+
+    #overlay h2 {
+      font-size: 1.8rem;
+      margin: 0 0 10px 0;
+      color: var(--core-color);
+      text-shadow: 0 0 10px var(--core-color);
+    }
+
+
+    /* Avatar Customization Styling */
+    .customization-section {
+      margin: 15px 0;
+      width: 100%;
+      text-align: center;
+    }
+
+
+    .custom-label {
+      font-size: 0.9rem;
+      color: #aaa;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+
+    .avatar-options, .color-options {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+
+    .avatar-card {
+      width: 60px;
+      height: 60px;
+      background: #141824;
+      border: 2px solid #333;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+
+    .avatar-card.selected {
+      border-color: var(--player-color);
+      box-shadow: 0 0 10px var(--player-color);
+      background: #1e2638;
+    }
+
+    .avatar-card.locked { border-style: dashed; opacity: 0.75; }
+    .avatar-card:focus-visible, button:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: 3px;
+    }
+
+    .avatar-card svg { pointer-events: none; }
+    .avatar-card small { display: block; color: #ffb703; font-size: 0.65rem; }
+
+    #store-panel {
+      display: none;
+      width: 100%;
+      margin-top: 12px;
+      padding: 10px;
+      border: 1px solid #ffb703;
+      background: #141824;
+    }
+
+    #store-items { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .store-item { padding: 8px; border: 1px solid #333; font-size: 0.75rem; }
+    .store-item button { padding: 6px 10px; font-size: 0.75rem; margin-top: 5px; }
+    #level-select {
+      width: 220px;
+      max-width: 100%;
+      padding: 8px;
+      color: #fff;
+      background: #141824;
+      border: 1px solid var(--player-color);
+      font: inherit;
+    }
+
+    .player-avatar {
+      animation: avatar-glow 0.8s ease-in-out infinite alternate;
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+
+    @keyframes avatar-glow {
+      from { filter: drop-shadow(0 0 2px currentColor); transform: scale(0.94); }
+      to { filter: drop-shadow(0 0 9px currentColor); transform: scale(1.08); }
+    }
+
+
+    .color-swatch {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: transform 0.2s;
+    }
+
+
+    .color-swatch.selected {
+      border-color: #ffffff;
+      transform: scale(1.25);
+      box-shadow: 0 0 8px currentColor;
+    }
+
+
+    button {
+      padding: 10px 25px;
+      font-size: 1rem;
+      font-family: inherit;
+      background: var(--player-color);
+      color: #000;
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 0 10px var(--player-color);
+      transition: transform 0.1s;
+      margin-top: 10px;
+    }
+
+
+    button:hover {
+      transform: scale(1.05);
+    }
+  </style>
+</head>
+<body>
+
+
+  <h1>CYBER GRID ESCAPE</h1>
+
+
+  <div id="hud">
+    <div>LIVES: <span id="hud-lives">3</span></div>
+    <div>TIME: <span id="hud-time">60</span>s</div>
+    <div>SCORE: <span id="hud-score">0</span></div>
+    <div>CORES: <span id="hud-cores">0/0</span></div>
+    <button id="sound-toggle" type="button" aria-pressed="true" onclick="toggleSound()">SOUND: ON</button>
+  </div>
+
+
+  <div id="game-container">
+    <svg id="grid-svg" viewBox="0 0 500 500">
+      <g id="grid-lines"></g>
+      <circle id="exit-gate" cx="475" cy="475" r="18" fill="var(--exit-locked)" stroke="#ffffff" stroke-width="2" />
+      <g id="cores-group"></g>
+      <g id="drones-group"></g>
+     
+      <!-- Player Group Dynamic SVG Container -->
+      <g id="player-group" transform="translate(0, 0)"></g>
+    </svg>
+
+
+    <div id="overlay">
+      <h2 id="overlay-title">CYBER GRID ESCAPE</h2>
+      <p id="overlay-desc" style="margin-bottom: 10px; text-align: center; max-width: 80%; font-size: 0.85rem;">
+        Use <b>WASD</b> or <b>Arrow Keys</b> to move.<br>Collect all Data Cores and reach the exit!
+      </p>
+
+
+      <!-- Customizer UI -->
+      <div class="customization-section">
+        <div class="custom-label">Choose Avatar Shape</div>
+        <div class="avatar-options">
+          <div class="avatar-card selected" onclick="selectAvatar('circle')" id="opt-circle" role="button" tabindex="0" aria-label="Select circle avatar">
+            <svg width="30" height="30" viewBox="-20 -20 40 40">
+              <circle r="14" fill="var(--player-color)" />
+            </svg>
+          </div>
+          <div class="avatar-card locked" onclick="selectAvatar('diamond')" id="opt-diamond" role="button" tabindex="0" aria-label="Diamond avatar, locked">
+            <svg width="30" height="30" viewBox="-20 -20 40 40">
+              <polygon points="0,-14 14,0 0,14 -14,0" fill="var(--player-color)" />
+            </svg>
+            <small>LOCKED</small>
+          </div>
+          <div class="avatar-card locked" onclick="selectAvatar('star')" id="opt-star" role="button" tabindex="0" aria-label="Star avatar, locked">
+            <svg width="30" height="30" viewBox="-20 -20 40 40">
+              <polygon points="0,-16 5,-5 16,-5 8,2 11,14 0,7 -11,14 -8,2 -16,-5 -5,-5" fill="var(--player-color)" />
+            </svg>
+            <small>LOCKED</small>
+          </div>
+          <div class="avatar-card locked" onclick="selectAvatar('core')" id="opt-core" role="button" tabindex="0" aria-label="Core avatar, locked">
+            <svg width="30" height="30" viewBox="-20 -20 40 40">
+              <rect x="-12" y="-12" width="24" height="24" fill="none" stroke="var(--player-color)" stroke-width="3" rx="3" />
+              <circle r="5" fill="var(--player-color)" />
+            </svg>
+            <small>LOCKED</small>
+          </div>
+          <div class="avatar-card locked" onclick="selectAvatar('hex')" id="opt-hex" role="button" tabindex="0" aria-label="Hex avatar, locked">
+            <svg width="30" height="30" viewBox="-20 -20 40 40">
+              <polygon points="-12,-7 0,-14 12,-7 12,7 0,14 -12,7" fill="none" stroke="var(--player-color)" stroke-width="3" />
+            </svg>
+            <small>LOCKED</small>
+          </div>
+          <div class="avatar-card locked" onclick="selectAvatar('pulse')" id="opt-pulse" role="button" tabindex="0" aria-label="Pulse avatar, locked">
+            <svg width="30" height="30" viewBox="-20 -20 40 40">
+              <circle r="12" fill="none" stroke="var(--player-color)" stroke-width="3" />
+              <path d="M-16 0h8l4-8 7 16 4-8h8" fill="none" stroke="var(--player-color)" stroke-width="2" />
+            </svg>
+            <small>LOCKED</small>
+          </div>
+        </div>
+
+
+        <div class="custom-label">Select Neon Color</div>
+        <div class="color-options">
+          <div class="color-swatch selected" style="background:#00f0ff; color:#00f0ff;" onclick="selectColor('#00f0ff')"></div>
+          <div class="color-swatch" style="background:#39ff14; color:#39ff14;" onclick="selectColor('#39ff14')"></div>
+          <div class="color-swatch" style="background:#ff00ff; color:#ff00ff;" onclick="selectColor('#ff00ff')"></div>
+          <div class="color-swatch" style="background:#ffb703; color:#ffb703;" onclick="selectColor('#ffb703')"></div>
+        </div>
+      </div>
+
+      <div id="progress-info">LEVEL <span id="hud-level">1</span> · CREDITS <span id="hud-credits">0</span></div>
+      <label class="custom-label" for="level-select">Select Level</label>
+      <select id="level-select" onchange="chooseLevel(Number(this.value))"></select>
+      <button id="store-toggle" onclick="toggleStore()">AVATAR STORE</button>
+      <div id="store-panel">
+        <div class="custom-label">Unlock new avatars</div>
+        <div id="store-items"></div>
+      </div>
+      <button id="continue-btn" onclick="continueGame()" style="display:none">CONTINUE</button>
+
+      <button id="start-btn" onclick="startGame()">START MISSION</button>
+    </div>
+  </div>
+
+
+  <script>
+    const GRID_SIZE = 10;
+    const CELL_SIZE = 50;
+    const AVATAR_COSTS = { circle: 0, diamond: 100, star: 150, core: 200, hex: 250, pulse: 300 };
+    const AVATAR_NAMES = { circle: 'Circle', diamond: 'Diamond', star: 'Star', core: 'Core', hex: 'Hex', pulse: 'Pulse' };
+    const LEVELS = [
+      {
+        time: 60,
+        cores: [{ x: 2, y: 1 }, { x: 7, y: 3 }, { x: 4, y: 6 }, { x: 8, y: 8 }],
+        drones: [{ x: 5, y: 1, dirY: 1, minY: 1, maxY: 8 }, { x: 2, y: 5, dirX: 1, minX: 1, maxX: 7 }]
+      },
+      {
+        time: 55,
+        cores: [{ x: 1, y: 4 }, { x: 4, y: 1 }, { x: 7, y: 2 }, { x: 8, y: 6 }, { x: 4, y: 8 }],
+        drones: [{ x: 3, y: 1, dirY: 1, minY: 1, maxY: 8 }, { x: 6, y: 2, dirY: 1, minY: 2, maxY: 8 }, { x: 2, y: 6, dirX: 1, minX: 1, maxX: 7 }]
+      },
+      {
+        time: 50,
+        cores: [{ x: 2, y: 2 }, { x: 7, y: 1 }, { x: 1, y: 7 }, { x: 5, y: 5 }, { x: 8, y: 4 }, { x: 7, y: 8 }],
+        drones: [{ x: 2, y: 1, dirY: 1, minY: 1, maxY: 8 }, { x: 5, y: 2, dirY: 1, minY: 1, maxY: 8 }, { x: 8, y: 1, dirY: 1, minY: 1, maxY: 8 }, { x: 2, y: 5, dirX: 1, minX: 1, maxX: 7 }]
+      }
+    ];
+    const LEVEL_COUNT = 100;
+    const AVAILABLE_CELLS = [];
+
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        if ((x !== 0 || y !== 0) && (x !== 9 || y !== 9)) AVAILABLE_CELLS.push({ x, y });
+      }
+    }
+
+    for (let levelNumber = LEVELS.length + 1; levelNumber <= LEVEL_COUNT; levelNumber++) {
+      const coreCount = Math.min(10, 6 + Math.floor((levelNumber - 3) / 12));
+      const coreOffset = (levelNumber * 7) % AVAILABLE_CELLS.length;
+      const cores = Array.from({ length: coreCount }, (_, index) => {
+        return { ...AVAILABLE_CELLS[(coreOffset + index * 13) % AVAILABLE_CELLS.length] };
+      });
+      const droneCount = Math.min(6, 4 + Math.floor((levelNumber - 4) / 15));
+      const drones = Array.from({ length: droneCount }, (_, index) => {
+        const lane = 1 + ((levelNumber * (index + 2) + index * 3) % 8);
+        const position = 1 + ((levelNumber + index * 2) % 6);
+        return index % 2 === 0
+          ? { x: lane, y: position, dirY: 1, minY: 1, maxY: 8 }
+          : { x: position, y: lane, dirX: 1, minX: 1, maxX: 8 };
+      });
+      LEVELS.push({
+        time: Math.max(35, 50 - Math.floor((levelNumber - 3) / 15) * 2),
+        cores,
+        drones
+      });
+    }
+
+    function loadProgress() {
+      const progress = { credits: 100, highestPassedLevel: 0, ownedShapes: ['circle'], selectedShape: 'circle' };
+      try {
+        const saved = JSON.parse(localStorage.getItem('cyberGridProgress') || 'null');
+        if (saved && Number.isFinite(saved.credits) && saved.credits >= 0) progress.credits = saved.credits;
+        if (saved && Number.isInteger(saved.highestPassedLevel)) {
+          progress.highestPassedLevel = Math.min(LEVELS.length, Math.max(0, saved.highestPassedLevel));
+        }
+        if (saved && Array.isArray(saved.ownedShapes)) {
+          progress.ownedShapes = ['circle', ...saved.ownedShapes.filter(shape => Object.prototype.hasOwnProperty.call(AVATAR_COSTS, shape))];
+        }
+        if (saved && progress.ownedShapes.includes(saved.selectedShape)) progress.selectedShape = saved.selectedShape;
+      } catch (error) {
+        console.error('Could not load saved game progress.', error);
+      }
+      progress.ownedShapes = [...new Set(progress.ownedShapes)];
+      return progress;
+    }
+
+    const savedProgress = loadProgress();
+
+
+    // Customization Settings
+    let currentShape = savedProgress.selectedShape;
+    let currentColor = '#00f0ff';
+    let credits = savedProgress.credits;
+    let highestPassedLevel = savedProgress.highestPassedLevel;
+    let ownedShapes = savedProgress.ownedShapes;
+    let currentLevel = Math.min(highestPassedLevel + 1, LEVELS.length);
+
+
+    // Game state
+    let player = { x: 0, y: 0 };
+    let cores = [];
+    let drones = [];
+    let exit = { x: 9, y: 9 };
+   
+    let lives = 3;
+    let score = 0;
+    let timeLeft = 60;
+    let gameLoopInterval = null;
+    let timerInterval = null;
+    let isPlaying = false;
+    let soundEnabled = true;
+    let audioContext = null;
+
+
+    // DOM Elements
+    const playerGroup = document.getElementById('player-group');
+    const exitEl = document.getElementById('exit-gate');
+    const coresGroup = document.getElementById('cores-group');
+    const dronesGroup = document.getElementById('drones-group');
+    const hudLives = document.getElementById('hud-lives');
+    const hudTime = document.getElementById('hud-time');
+    const hudScore = document.getElementById('hud-score');
+    const hudCores = document.getElementById('hud-cores');
+    const overlay = document.getElementById('overlay');
+    const overlayTitle = document.getElementById('overlay-title');
+    const overlayDesc = document.getElementById('overlay-desc');
+
+
+    function buildGridLines() {
+      const group = document.getElementById('grid-lines');
+      group.innerHTML = '';
+      for (let i = 0; i <= GRID_SIZE; i++) {
+        const pos = i * CELL_SIZE;
+        group.innerHTML += `<line class="grid-line" x1="0" y1="${pos}" x2="500" y2="${pos}" />`;
+        group.innerHTML += `<line class="grid-line" x1="${pos}" y1="0" x2="${pos}" y2="500" />`;
+      }
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      const button = document.getElementById('sound-toggle');
+      button.textContent = `SOUND: ${soundEnabled ? 'ON' : 'OFF'}`;
+      button.setAttribute('aria-pressed', String(soundEnabled));
+    }
+
+    function playSound(effect) {
+      if (!soundEnabled) return;
+
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) {
+        console.warn('Web Audio is not available in this browser.');
+        return;
+      }
+
+      if (!audioContext) audioContext = new AudioContextClass();
+      if (audioContext.state === 'suspended') audioContext.resume();
+
+      const patterns = {
+        start: [440, 660],
+        collect: [740, 990],
+        hit: [220, 165],
+        purchase: [660, 880],
+        win: [523, 659, 784, 1046],
+        gameOver: [392, 294, 220, 165]
+      };
+      const notes = patterns[effect];
+      if (!notes) return;
+
+      const now = audioContext.currentTime;
+      notes.forEach((frequency, index) => {
+        const beginsAt = now + index * 0.1;
+        const oscillator = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(frequency, beginsAt);
+        gain.gain.setValueAtTime(0.001, beginsAt);
+        gain.gain.exponentialRampToValueAtTime(0.12, beginsAt + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.001, beginsAt + 0.18);
+        oscillator.connect(gain);
+        gain.connect(audioContext.destination);
+        oscillator.start(beginsAt);
+        oscillator.stop(beginsAt + 0.19);
+      });
+    }
+
+
+    // Avatar Selection Methods
+    function selectAvatar(shape) {
+      if (!ownedShapes.includes(shape)) {
+        toggleStore(true);
+        return;
+      }
+      currentShape = shape;
+      document.querySelectorAll('.avatar-card').forEach(c => c.classList.remove('selected'));
+      document.getElementById(`opt-${shape}`).classList.add('selected');
+      saveProgress();
+      renderPlayerShape();
+    }
+
+    function saveProgress() {
+      localStorage.setItem('cyberGridProgress', JSON.stringify({ credits, highestPassedLevel, ownedShapes, selectedShape: currentShape }));
+    }
+
+    function updateProgressUI() {
+      document.getElementById('hud-level').textContent = currentLevel;
+      document.getElementById('hud-credits').textContent = credits;
+
+      Object.keys(AVATAR_COSTS).forEach(shape => {
+        const card = document.getElementById(`opt-${shape}`);
+        const owned = ownedShapes.includes(shape);
+        card.classList.toggle('locked', !owned);
+        card.classList.toggle('selected', currentShape === shape);
+        card.setAttribute('aria-label', `${owned ? 'Select' : 'Locked'} ${AVATAR_NAMES[shape]} avatar${owned ? '' : `, costs ${AVATAR_COSTS[shape]} credits`}`);
+        const label = card.querySelector('small');
+        if (label) label.textContent = owned ? '' : `${AVATAR_COSTS[shape]} CR`;
+      });
+
+      document.getElementById('level-select').innerHTML = LEVELS.map((level, index) => {
+        const number = index + 1;
+        const locked = number > highestPassedLevel + 1;
+        return `<option value="${number}" ${number === currentLevel ? 'selected' : ''} ${locked ? 'disabled' : ''}>LEVEL ${number}${locked ? ' (LOCKED)' : ''}</option>`;
+      }).join('');
+
+      document.getElementById('store-items').innerHTML = Object.keys(AVATAR_COSTS)
+        .filter(shape => shape !== 'circle')
+        .map(shape => {
+          const owned = ownedShapes.includes(shape);
+          const cost = AVATAR_COSTS[shape];
+          return `<div class="store-item"><strong>${AVATAR_NAMES[shape]}</strong><br>${owned ? 'Owned' : `${cost} credits`}<br><button type="button" onclick="buyAvatar('${shape}')" ${owned || credits < cost ? 'disabled' : ''}>${owned ? 'PURCHASED' : 'BUY'}</button></div>`;
+        }).join('');
+    }
+
+    function chooseLevel(level) {
+      if (!Number.isInteger(level) || level < 1 || level > highestPassedLevel + 1 || level > LEVELS.length) return;
+      currentLevel = level;
+      updateProgressUI();
+      overlayTitle.textContent = `LEVEL ${currentLevel}`;
+      document.getElementById('start-btn').textContent = `START LEVEL ${currentLevel}`;
+      document.getElementById('start-btn').onclick = () => startGame();
+    }
+
+    function toggleStore(forceOpen) {
+      const panel = document.getElementById('store-panel');
+      const open = typeof forceOpen === 'boolean' ? forceOpen : panel.style.display !== 'block';
+      panel.style.display = open ? 'block' : 'none';
+      document.getElementById('store-toggle').textContent = open ? 'CLOSE STORE' : 'AVATAR STORE';
+    }
+
+    function buyAvatar(shape) {
+      if (!Object.prototype.hasOwnProperty.call(AVATAR_COSTS, shape) || ownedShapes.includes(shape)) return;
+      const cost = AVATAR_COSTS[shape];
+      if (credits < cost) return;
+      credits -= cost;
+      ownedShapes.push(shape);
+      saveProgress();
+      updateProgressUI();
+      selectAvatar(shape);
+      playSound('purchase');
+    }
+
+
+    function selectColor(color) {
+      currentColor = color;
+      document.documentElement.style.setProperty('--player-color', color);
+      document.querySelectorAll('.color-swatch').forEach(s => {
+        s.classList.toggle('selected', s.style.backgroundColor === color || s.style.backgroundColor === hexToRgb(color));
+      });
+      renderPlayerShape();
+    }
+
+
+    function hexToRgb(hex) {
+      // Helper conversion for swatch active styling comparison
+      const bigint = parseInt(hex.replace('#', ''), 16);
+      const r = (bigint >> 16) & 255, g = (bigint >> 8) & 255, b = bigint & 255;
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+
+
+    function renderPlayerShape() {
+      let svgMarkup = '';
+      switch (currentShape) {
+        case 'diamond':
+          svgMarkup = `<polygon points="0,-14 14,0 0,14 -14,0" fill="${currentColor}" filter="drop-shadow(0 0 6px ${currentColor})" />`;
+          break;
+        case 'star':
+          svgMarkup = `<polygon points="0,-16 5,-5 16,-5 8,2 11,14 0,7 -11,14 -8,2 -16,-5 -5,-5" fill="${currentColor}" filter="drop-shadow(0 0 6px ${currentColor})" />`;
+          break;
+        case 'core':
+          svgMarkup = `
+            <g class="player-avatar"><rect x="-12" y="-12" width="24" height="24" fill="none" stroke="${currentColor}" stroke-width="3" rx="3" />
+            <circle r="5" fill="${currentColor}" /></g>`;
+          break;
+        case 'hex':
+          svgMarkup = `<polygon class="player-avatar" points="-12,-7 0,-14 12,-7 12,7 0,14 -12,7" fill="none" stroke="${currentColor}" stroke-width="3" />`;
+          break;
+        case 'pulse':
+          svgMarkup = `<g class="player-avatar"><circle r="12" fill="none" stroke="${currentColor}" stroke-width="3" />
+            <path d="M-16 0h8l4-8 7 16 4-8h8" fill="none" stroke="${currentColor}" stroke-width="2" /></g>`;
+          break;
+        case 'circle':
+        default:
+          svgMarkup = `<circle class="player-avatar" r="14" fill="${currentColor}" />`;
+          break;
+      }
+      if (currentShape === 'diamond' || currentShape === 'star') {
+        svgMarkup = svgMarkup.replace('<polygon ', '<polygon class="player-avatar" ');
+      }
+      playerGroup.innerHTML = svgMarkup;
+    }
+
+    function initLevel() {
+      player = { x: 0, y: 0 };
+      const level = LEVELS[currentLevel - 1];
+      cores = level.cores.map(core => ({ ...core }));
+      drones = level.drones.map(drone => ({ ...drone }));
+      timeLeft = level.time;
+
+
+      updateHUD();
+      updateProgressUI();
+      renderPlayerShape();
+      renderAll();
+    }
+
+
+    function startGame(resetScore = true) {
+      lives = 3;
+      if (resetScore) score = 0;
+      isPlaying = true;
+      overlay.style.display = 'none';
+      toggleStore(false);
+      playSound('start');
+
+
+      initLevel();
+
+
+      clearInterval(gameLoopInterval);
+      clearInterval(timerInterval);
+
+
+      gameLoopInterval = setInterval(updateGame, 180);
+
+
+      timerInterval = setInterval(() => {
+        if (!isPlaying) return;
+        timeLeft--;
+        hudTime.textContent = timeLeft;
+        if (timeLeft <= 0) {
+          gameOver("Time expired! System reset.");
+        }
+      }, 1000);
+    }
+
+    function continueGame() {
+      if (currentLevel < LEVELS.length) {
+        currentLevel++;
+        startGame(false);
+      } else {
+        restartCampaign();
+      }
+    }
+
+    function restartCampaign() {
+      currentLevel = 1;
+      startGame(true);
+    }
+
+
+    function updateGame() {
+      if (!isPlaying) return;
+
+
+      drones.forEach(drone => {
+        if (drone.dirY) {
+          drone.y += drone.dirY;
+          if (drone.y >= drone.maxY || drone.y <= drone.minY) drone.dirY *= -1;
+        }
+        if (drone.dirX) {
+          drone.x += drone.dirX;
+          if (drone.x >= drone.maxX || drone.x <= drone.minX) drone.dirX *= -1;
+        }
+      });
+
+
+      checkCollisions();
+      renderAll();
+    }
+
+
+    function checkCollisions() {
+      const hitDrone = drones.some(d => d.x === player.x && d.y === player.y);
+      if (hitDrone) {
+        handleHit("Intercepted by Security Drone!");
+        return;
+      }
+
+
+      let collected = false;
+      cores = cores.filter(core => {
+        if (core.x === player.x && core.y === player.y) {
+          score += 100;
+          collected = true;
+          return false;
+        }
+        return true;
+      });
+      if (collected) playSound('collect');
+
+
+      if (cores.length === 0 && player.x === exit.x && player.y === exit.y) {
+        score += timeLeft * 10;
+        finishLevel();
+        return;
+      }
+
+
+      updateHUD();
+    }
+
+
+    function handleHit(reason) {
+      lives--;
+      playSound('hit');
+      updateHUD();
+      if (lives <= 0) {
+        gameOver(reason || "SYSTEM PURGE: GAME OVER");
+      } else {
+        player = { x: 0, y: 0 };
+        renderPlayer();
+      }
+    }
+
+    function finishLevel() {
+      isPlaying = false;
+      clearInterval(gameLoopInterval);
+      clearInterval(timerInterval);
+      playSound('win');
+
+      const reward = 100 + timeLeft * 2;
+      credits += reward;
+      highestPassedLevel = Math.max(highestPassedLevel, currentLevel);
+      saveProgress();
+      overlayTitle.textContent = currentLevel === LEVELS.length ? 'CAMPAIGN COMPLETE!' : `LEVEL ${currentLevel} CLEARED!`;
+      overlayTitle.style.color = 'var(--exit-unlocked)';
+      overlayDesc.innerHTML = `Data secured!<br><br>Level reward: <b>${reward} credits</b><br>Score: <b>${score}</b>`;
+      document.getElementById('start-btn').style.display = currentLevel === LEVELS.length ? 'inline-block' : 'none';
+      document.getElementById('start-btn').textContent = currentLevel === LEVELS.length ? 'RESTART CAMPAIGN' : 'PLAY AGAIN';
+      document.getElementById('start-btn').onclick = currentLevel === LEVELS.length ? restartCampaign : () => startGame();
+      document.getElementById('continue-btn').style.display = currentLevel === LEVELS.length ? 'none' : 'inline-block';
+      overlay.style.display = 'flex';
+      updateProgressUI();
+    }
+
+    function gameOver(message) {
+      isPlaying = false;
+      clearInterval(gameLoopInterval);
+      clearInterval(timerInterval);
+      playSound('gameOver');
+      currentLevel = Math.max(1, highestPassedLevel);
+      overlayTitle.textContent = 'GAME OVER';
+      overlayTitle.style.color = 'var(--drone-color)';
+      overlayDesc.innerHTML = `${message}<br><br>Returning to your last cleared level: <b>${currentLevel}</b><br>Score: <b>${score}</b>`;
+      document.getElementById('start-btn').style.display = 'inline-block';
+      document.getElementById('start-btn').textContent = `RETURN TO LEVEL ${currentLevel}`;
+      document.getElementById('start-btn').onclick = () => startGame();
+      document.getElementById('continue-btn').style.display = 'none';
+      overlay.style.display = 'flex';
+      updateProgressUI();
+    }
+
+
+    function renderAll() {
+      renderPlayer();
+      renderCores();
+      renderDrones();
+      renderExit();
+    }
+
+
+    function renderPlayer() {
+      const px = player.x * CELL_SIZE + CELL_SIZE / 2;
+      const py = player.y * CELL_SIZE + CELL_SIZE / 2;
+      playerGroup.setAttribute('transform', `translate(${px}, ${py})`);
+    }
+
+
+    function renderCores() {
+      coresGroup.innerHTML = cores.map(c => `
+        <polygon points="
+          ${c.x * CELL_SIZE + 25},${c.y * CELL_SIZE + 10}
+          ${c.x * CELL_SIZE + 40},${c.y * CELL_SIZE + 25}
+          ${c.x * CELL_SIZE + 25},${c.y * CELL_SIZE + 40}
+          ${c.x * CELL_SIZE + 10},${c.y * CELL_SIZE + 25}
+        " fill="var(--core-color)" filter="drop-shadow(0 0 4px var(--core-color))" />
+      `).join('');
+    }
+
+
+    function renderDrones() {
+      dronesGroup.innerHTML = drones.map(d => `
+        <rect x="${d.x * CELL_SIZE + 10}" y="${d.y * CELL_SIZE + 10}"
+              width="30" height="30" fill="var(--drone-color)" rx="4"
+              filter="drop-shadow(0 0 5px var(--drone-color))" />
+      `).join('');
+    }
+
+
+    function renderExit() {
+      const unlocked = cores.length === 0;
+      exitEl.setAttribute('fill', unlocked ? 'var(--exit-unlocked)' : 'var(--exit-locked)');
+      if (unlocked) {
+        exitEl.setAttribute('filter', 'drop-shadow(0 0 8px var(--exit-unlocked))');
+      } else {
+        exitEl.removeAttribute('filter');
+      }
+    }
+
+
+    function updateHUD() {
+      hudLives.textContent = lives;
+      hudTime.textContent = timeLeft;
+      hudScore.textContent = score;
+      const totalCores = LEVELS[currentLevel - 1].cores.length;
+      hudCores.textContent = `${totalCores - cores.length}/${totalCores}`;
+    }
+
+
+    // Input Handling
+    window.addEventListener('keydown', (e) => {
+      if (!isPlaying) return;
+
+
+      let nextX = player.x;
+      let nextY = player.y;
+
+
+      switch(e.key) {
+        case 'ArrowUp': case 'w': case 'W': nextY--; break;
+        case 'ArrowDown': case 's': case 'S': nextY++; break;
+        case 'ArrowLeft': case 'a': case 'A': nextX--; break;
+        case 'ArrowRight': case 'd': case 'D': nextX++; break;
+        default: return;
+      }
+
+
+      if (nextX >= 0 && nextX < GRID_SIZE && nextY >= 0 && nextY < GRID_SIZE) {
+        player.x = nextX;
+        player.y = nextY;
+        checkCollisions();
+        renderPlayer();
+      }
+    });
+
+
+    document.querySelectorAll('.avatar-card').forEach(card => {
+      card.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          card.click();
+        }
+      });
+    });
+
+    buildGridLines();
+    initLevel();
+    updateProgressUI();
+  </script>
+</body>
+</html>
+
