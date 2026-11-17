@@ -74,6 +74,9 @@
       width: 100%;
       height: 100%;
       display: block;
+      touch-action: none;
+      user-select: none;
+      cursor: crosshair;
     }
 
 
@@ -263,7 +266,7 @@
     <div id="overlay">
       <h2 id="overlay-title">CYBER GRID ESCAPE</h2>
       <p id="overlay-desc" style="margin-bottom: 10px; text-align: center; max-width: 80%; font-size: 0.85rem;">
-        Use <b>WASD</b> or <b>Arrow Keys</b> to move.<br>Collect all Data Cores and reach the exit!
+        Use <b>WASD</b>, <b>Arrow Keys</b>, or swipe the grid to move.<br>Collect all Data Cores and reach the exit!
       </p>
 
 
@@ -436,6 +439,7 @@
 
     // DOM Elements
     const playerGroup = document.getElementById('player-group');
+    const gridSvg = document.getElementById('grid-svg');
     const exitEl = document.getElementById('exit-gate');
     const coresGroup = document.getElementById('cores-group');
     const dronesGroup = document.getElementById('drones-group');
@@ -850,29 +854,60 @@
 
 
     // Input Handling
+    function movePlayer(dx, dy) {
+      if (!isPlaying) return;
+
+      const nextX = player.x + dx;
+      const nextY = player.y + dy;
+      if (nextX < 0 || nextX >= GRID_SIZE || nextY < 0 || nextY >= GRID_SIZE) return;
+
+      player.x = nextX;
+      player.y = nextY;
+      checkCollisions();
+      renderPlayer();
+    }
+
+    let pointerStart = null;
+    gridSvg.addEventListener('pointerdown', event => {
+      if (!isPlaying) return;
+      pointerStart = { id: event.pointerId, x: event.clientX, y: event.clientY };
+      gridSvg.setPointerCapture(event.pointerId);
+    });
+
+    gridSvg.addEventListener('pointerup', event => {
+      if (!pointerStart || event.pointerId !== pointerStart.id) return;
+      const deltaX = event.clientX - pointerStart.x;
+      const deltaY = event.clientY - pointerStart.y;
+      pointerStart = null;
+
+      const threshold = Math.max(12, Math.min(28, gridSvg.clientWidth * 0.04));
+      if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) < threshold) return;
+      if (Math.abs(deltaX) >= Math.abs(deltaY)) {
+        movePlayer(deltaX > 0 ? 1 : -1, 0);
+      } else {
+        movePlayer(0, deltaY > 0 ? 1 : -1);
+      }
+    });
+
+    gridSvg.addEventListener('pointercancel', () => {
+      pointerStart = null;
+    });
+
     window.addEventListener('keydown', (e) => {
       if (!isPlaying) return;
 
-
-      let nextX = player.x;
-      let nextY = player.y;
-
-
+      let dx = 0;
+      let dy = 0;
       switch(e.key) {
-        case 'ArrowUp': case 'w': case 'W': nextY--; break;
-        case 'ArrowDown': case 's': case 'S': nextY++; break;
-        case 'ArrowLeft': case 'a': case 'A': nextX--; break;
-        case 'ArrowRight': case 'd': case 'D': nextX++; break;
+        case 'ArrowUp': case 'w': case 'W': dy = -1; break;
+        case 'ArrowDown': case 's': case 'S': dy = 1; break;
+        case 'ArrowLeft': case 'a': case 'A': dx = -1; break;
+        case 'ArrowRight': case 'd': case 'D': dx = 1; break;
         default: return;
       }
 
-
-      if (nextX >= 0 && nextX < GRID_SIZE && nextY >= 0 && nextY < GRID_SIZE) {
-        player.x = nextX;
-        player.y = nextY;
-        checkCollisions();
-        renderPlayer();
-      }
+      e.preventDefault();
+      movePlayer(dx, dy);
     });
 
 
